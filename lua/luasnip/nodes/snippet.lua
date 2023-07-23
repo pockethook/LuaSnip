@@ -485,8 +485,7 @@ local function find_snippettree_position(pos)
 			-- idea to sidestep the damaged snippet, even if no error occurred
 			-- _right now_, is to ensure that we can input_enter all the nodes
 			-- along the insertion-path correctly).
-			local bad_snippet = prev_parent_children[child_indx]
-			bad_snippet:remove_from_jumplist()
+			found_parent:remove_from_jumplist()
 			-- continue again with same parent, but one less snippet in its
 			-- children => shouldn't cause endless loop.
 		elseif found_parent == nil then
