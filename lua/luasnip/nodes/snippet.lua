@@ -499,6 +499,12 @@ local function find_snippettree_position(pos)
 end
 
 function Snippet:remove_from_jumplist()
+	if not self.visible then
+		-- snippet not visible => already removed.
+		-- Don't remove it twice.
+		return
+	end
+
 	-- prev is i(-1)(startNode), prev of that is the outer/previous snippet.
 	-- pre is $0 or insertNode.
 	local pre = self.prev.prev
