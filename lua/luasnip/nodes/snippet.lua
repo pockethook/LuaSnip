@@ -578,7 +578,7 @@ local function insert_into_jumplist(snippet, start_node, current_node, parent_no
 			if prev ~= nil then
 				-- if we have a previous snippet we can link to, just do that.
 				prev.next.next = snippet
-				start_node.prev = prev
+				start_node.prev = prev.insert_nodes[0]
 			else
 				if can_link_parent_node then
 					-- prev is nil, but we can link up using the parent.
