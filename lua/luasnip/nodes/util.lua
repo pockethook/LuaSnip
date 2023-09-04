@@ -176,8 +176,8 @@ local function wrap_context(context)
 end
 
 local function linkable_node(node)
-	-- node.type has to be one of insertNode, snippetNode, exitNode.
-	return vim.tbl_contains({types.insertNode, types.snippetNode, types.exitNode}, rawget(node, "type"))
+	-- node.type has to be one of insertNode, exitNode.
+	return vim.tbl_contains({types.insertNode, types.exitNode}, rawget(node, "type"))
 end
 
 local cmp_functions = {
