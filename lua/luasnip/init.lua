@@ -606,6 +606,7 @@ local function exit_out_of_region(node)
 
 	if not ok then
 		remove_snip_set_adjacent_as_current(snippet, "Error while getting extmark-position: %s", snip_begin_pos)
+		return
 	end
 
 	-- stylua: ignore
@@ -618,12 +619,14 @@ local function exit_out_of_region(node)
 		local leave_ok, errmsg = pcall(node_util.leave_nodes_between, snippet, node, true)
 		if not leave_ok then
 			remove_snip_set_adjacent_as_current(snippet, "Error while leaving nodes: %s", errmsg)
+			return
 		end
 		-- leave_nodes_between does not leave snippet, have to do this
 		-- here.
 		leave_ok, errmsg = pcall(snippet.input_leave, snippet, true)
 		if not leave_ok then
 			remove_snip_set_adjacent_as_current(snippet, "Error while leaving nodes: %s", errmsg)
+			return
 		end
 
 		local next_active = snippet.insert_nodes[0]
