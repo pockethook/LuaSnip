@@ -293,8 +293,8 @@ function RestoreNode:subtree_set_rgrav(rgrav)
 	end
 end
 
-function RestoreNode:node_at(pos)
-	return self.snip:node_at(pos)
+function RestoreNode:node_at(pos, mode)
+	return self.snip:node_at(pos, mode)
 end
 
 function RestoreNode:extmarks_valid()

@@ -423,8 +423,8 @@ function DynamicNode:subtree_set_rgrav(rgrav)
 	end
 end
 
-function DynamicNode:node_at(pos)
-	return self.snip:node_at(pos)
+function DynamicNode:node_at(pos, mode)
+	return self.snip:node_at(pos, mode)
 end
 
 function DynamicNode:extmarks_valid()

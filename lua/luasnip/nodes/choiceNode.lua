@@ -418,8 +418,8 @@ function ChoiceNode:subtree_set_rgrav(rgrav)
 	end
 end
 
-function ChoiceNode:node_at(pos)
-	return self.active_choice:node_at(pos)
+function ChoiceNode:node_at(pos, mode)
+	return self.active_choice:node_at(pos, mode)
 end
 
 function ChoiceNode:extmarks_valid()

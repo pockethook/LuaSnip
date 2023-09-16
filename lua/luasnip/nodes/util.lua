@@ -180,57 +180,94 @@ local function linkable_node(node)
 	return vim.tbl_contains({types.insertNode, types.exitNode}, rawget(node, "type"))
 end
 
-local cmp_functions = {
-	rgrav_less = function(pos, range_from)
-		return util.pos_cmp(pos, range_from) < 0
-	end,
-	rgrav_greater = function(pos, range_to)
-		return util.pos_cmp(pos, range_to) >= 0
-	end,
-	boundary_outside_less = function(pos, range_from)
-		return util.pos_cmp(pos, range_from) <= 0
-	end,
-	boundary_outside_greater = function(pos, range_to)
-		return util.pos_cmp(pos, range_to) >= 0
+-- mainly used internally, by binarysearch_pos.
+-- these are the nodes that are definitely not linkable, there are nodes like
+-- dynamicNode or snippetNode that might be linkable, depending on their
+-- content. Could look into that to make this more complete, but that does not
+-- feel appropriate (higher runtime), most cases should be served well by this
+-- heuristic.
+local function non_linkable_node(node)
+	return vim.tbl_contains({types.textNode, types.functionNode}, rawget(node, "type"))
+end
+-- return whether a node is certainly (not) interactive.
+-- Coincindentially, the same nodes as (non-)linkable ones, but since there is a
+-- semantic difference, use separate names.
+local interactive_node = linkable_node
+local non_interactive_node = non_linkable_node
+
+local function prefer_nodes(prefer_func, reject_func)
+	return function(cmp_mid_to, cmp_mid_from, mid_node)
+		local reject_mid = reject_func(mid_node)
+		local prefer_mid = prefer_func(mid_node)
+
+		-- if we can choose which node to continue in, prefer the one that
+		-- may be linkable/interactive.
+		if cmp_mid_to == 0 and reject_mid then
+			return true, false
+		elseif cmp_mid_from == 0 and reject_mid then
+			return false, true
+		elseif (cmp_mid_to == 0 or cmp_mid_from == 0) and prefer_mid then
+			return false, false
+		else
+			return cmp_mid_to >= 0, cmp_mid_from < 0
+		end
 	end
+end
+
+-- functions for resolving conflicts, if `pos` is on the boundary of two nodes.
+-- Return whether to continue behind or before mid (in that order).
+-- At most one of those may be true, of course.
+local binarysearch_preference = {
+	outside = function(cmp_mid_to, cmp_mid_from, _)
+		return cmp_mid_to >= 0, cmp_mid_from <= 0
+	end,
+	linkable = prefer_nodes(linkable_node, non_linkable_node),
+	interactive = prefer_nodes(interactive_node, non_interactive_node)
 }
 -- `nodes` is a list of nodes ordered by their occurrence in the buffer.
 -- `pos` is a row-column-tuble, byte-columns, and we return the node the LEFT
 -- EDGE(/side) of `pos` is inside.
 -- This convention is chosen since a snippet inserted at `pos` will move the
 -- character at `pos` to the right.
--- The exact meaning of "inside" can be influenced with `respect_rgravs`:
--- * if it is true, "inside" is replicated to match the shifting-behaviour of
+-- The exact meaning of "inside" can be influenced with `respect_rgravs` and
+-- `boundary_resolve_mode`:
+-- * if `respect_rgravs` is true, "inside" emulates the shifting-behaviour of
 --   extmarks:
 --   First of all, we compare the left edge of `pos` with the left/right edges
 --   of from/to, depending on rgrav.
 --   If the left edge is <= left/right edge of from, and < left/right edge of
 --   to, `pos` is inside the node.
 --
--- * if it is false, pos has to be fully inside a node to be considered inside
---   it. If pos is on the left endpoint, it is considered to be left of the
---   node, and likewise for the right endpoint.
+-- * if `respect_rgravs` is false, pos has to be fully inside a node to be
+--   considered inside it. If pos is on the left endpoint, it is considered to be
+--   left of the node, and likewise for the right endpoint.
+--
+-- * `boundary_resolve_mode` changes how a position on the boundary of a node
+-- is treated:
+-- * for `"prefer_linkable/interactive"`, we assume that the nodes in `nodes` are
+-- contiguous, and prefer falling into the previous/next node if `pos` is on
+-- mid's boundary, and mid is not linkable/interactie.
+-- This way, we are more likely to return a node that can handle a new
+-- snippet/is interactive.
+-- * `"prefer_outside"` makes sense when the nodes are not contiguous, and we'd
+-- like to find a position between two nodes.  
+-- This mode makes sense for finding the snippet a new snippet should be
+-- inserted in, since we'd like to prefer inserting before/after a snippet, if
+-- the position is ambiguous.
 -- 
--- This differentiation is useful for making this function more general:
--- When searching in the contiguous nodes of a snippet, we'd like this routine
--- to return any of them (obviously the one pos is inside/or on the border of),
--- but in no case fail.
+-- In general:  
+-- These options are useful for making this function more general: When
+-- searching in the contiguous nodes of a snippet, we'd like this routine to
+-- return any of them (obviously the one pos is inside/or on the border of, and
+-- we'd like to prefer returning a node that can be linked), but in no case
+-- fail.
 -- However! when searching the top-level snippets with the intention of finding
 -- the snippet/node a new snippet should be expanded inside, it seems better to
 -- shift an existing snippet to the right/left than expand the new snippet
 -- inside it (when the expand-point is on the boundary).
-local function binarysearch_pos(nodes, pos, respect_rgravs)
+local function binarysearch_pos(nodes, pos, respect_rgravs, boundary_resolve_mode)
 	local left = 1
 	local right = #nodes
-
-	local less, greater
-	if respect_rgravs then
-		less = cmp_functions.rgrav_less
-		greater = cmp_functions.rgrav_greater
-	else
-		less = cmp_functions.boundary_outside_less
-		greater = cmp_functions.boundary_outside_greater
-	end
 
 	-- actual search-routine from
 	-- https://github.com/Roblox/Wiki-Lua-Libraries/blob/master/StandardLibraries/BinarySearch.lua
@@ -263,13 +300,19 @@ local function binarysearch_pos(nodes, pos, respect_rgravs)
 				mid_to[2] = mid_to[2] + 1
 			end
 		end
-		if greater(pos, mid_to) then
+
+		local cmp_mid_to = util.pos_cmp(pos, mid_to)
+		local cmp_mid_from = util.pos_cmp(pos, mid_from)
+
+		local cont_behind_mid, cont_before_mid = boundary_resolve_mode(cmp_mid_to, cmp_mid_from, nodes[mid])
+
+		if cont_behind_mid then
 			-- make sure right-left becomes smaller.
 			left = mid + 1
 			if left > right then
 				return nil, mid + 1
 			end
-		elseif less(pos, mid_from) then
+		elseif cont_before_mid then
 			-- continue search on left side
 			right = mid - 1
 			if left > right then
@@ -531,6 +574,7 @@ return {
 	snippet_extend_context = snippet_extend_context,
 	linkable_node = linkable_node,
 	binarysearch_pos = binarysearch_pos,
+	binarysearch_preference = binarysearch_preference,
 	refocus = refocus,
 	generic_extmarks_valid = generic_extmarks_valid
 }

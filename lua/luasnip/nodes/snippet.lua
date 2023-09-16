@@ -476,15 +476,19 @@ local function find_snippettree_position(pos)
 	local prev_parent_children = session.snippet_roots[vim.api.nvim_get_current_buf()]
 
 	while true do
-		-- `false`: if pos is on the boundary of a snippet, consider it as
-		-- outside the snippet (in other words, prefer shifting the snippet to
-		-- continuing the search inside it.)
-		local found_parent, child_indx = node_util.binarysearch_pos(prev_parent_children, pos, false)
-		if found_parent == false or (found_parent ~= nil and not found_parent:extmarks_valid()) then
-			-- error while running procedure, or found snippet damaged (the
-			-- idea to sidestep the damaged snippet, even if no error occurred
-			-- _right now_, is to ensure that we can input_enter all the nodes
-			-- along the insertion-path correctly).
+		-- false: don't respect rgravs.
+		-- Prefer inserting the snippet outside an existing one.
+		local found_parent, child_indx = node_util.binarysearch_pos(prev_parent_children, pos, false, node_util.binarysearch_preference.outside)
+		if found_parent == false then
+			-- if the procedure returns false, there was an error getting the
+			-- position of a node (in this case, that node is a snippet).
+			-- The position of the offending snippet is returned in child_indx,
+			-- and we can remove it here.
+			prev_parent_children[child_indx]:remove_from_jumplist()
+		elseif (found_parent ~= nil and not found_parent:extmarks_valid()) then
+			-- found snippet damaged (the idea to sidestep the damaged snippet,
+			-- even if no error occurred _right now_, is to ensure that we can
+			-- input_enter all the nodes along the insertion-path correctly).
 			found_parent:remove_from_jumplist()
 			-- continue again with same parent, but one less snippet in its
 			-- children => shouldn't cause endless loop.
@@ -493,6 +497,8 @@ local function find_snippettree_position(pos)
 			return prev_parent, prev_parent_children, child_indx
 		else
 			prev_parent = found_parent
+			-- can index prev_parent, since found_parent is not nil, and
+			-- assigned to prev_parent.
 			prev_parent_children = prev_parent.child_snippets
 		end
 	end
@@ -643,11 +649,11 @@ function Snippet:trigger_expand(current_node, pos_id, env)
 	local pos = vim.api.nvim_buf_get_extmark_by_id(0, session.ns_id, pos_id, {})
 
 	local parent_snippet, sibling_snippets, own_indx, parent_node
-	-- find snippettree-position.
+	-- find tree-node the snippet should be inserted at (could be before another node).
 	parent_snippet, sibling_snippets, own_indx = find_snippettree_position(pos)
 	if parent_snippet then
-		-- if found, find node to insert at.
-		parent_node = parent_snippet:node_at(pos)
+		-- if found, find node to insert at, prefer receiving a linkable node.
+		parent_node = parent_snippet:node_at(pos, node_util.binarysearch_preference.linkable)
 		-- it may happen, that the cursor is on the boundary of an insertNode
 		-- and a textNode, and binarysearch_pos finds the textNode.
 		-- Since this is undesirable, we check for this case here, and instead
@@ -666,7 +672,7 @@ function Snippet:trigger_expand(current_node, pos_id, env)
 			local alt_node = parent_node.parent.nodes[alt_node_indx]
 			if alt_node and (alt_node.type ~= types.textNode and alt_node.type ~= types.functionNode) then
 				-- continue search in alternative node.
-				parent_node = alt_node:node_at(pos)
+				parent_node = alt_node:node_at(pos, node_util.binarysearch_preference.linkable)
 			else
 				break
 			end
@@ -1397,27 +1403,27 @@ end
 
 -- traverses this snippet, and finds the smallest node containing pos.
 -- pos-column has to be a byte-index, not a display-column.
-function Snippet:smallest_node_at(pos)
+function Snippet:smallest_node_at(pos, mode)
 	local self_from, self_to = self.mark:pos_begin_end_raw()
 	assert(util.pos_cmp(self_from, pos) <= 0 and util.pos_cmp(pos, self_to) <= 0, "pos is not inside the snippet.")
 
-	local smallest_node = self:node_at(pos)
+	local smallest_node = self:node_at(pos, mode)
 	assert(smallest_node ~= nil, "could not find a smallest node (very unexpected)")
 
 	return smallest_node
 end
 
-function Snippet:node_at(pos)
+function Snippet:node_at(pos, mode)
 	if #self.nodes == 0 then
 		-- special case: no children (can naturally occur with dynamicNode,
 		-- when its function could not be evaluated, or if a user passed an empty snippetNode).
 		return self
 	end
 
-	local found_node = node_util.binarysearch_pos(self.nodes, pos, true)
+	local found_node = node_util.binarysearch_pos(self.nodes, pos, true, mode)
 	assert(found_node ~= nil, "could not find node in snippet")
 
-	return found_node:node_at(pos)
+	return found_node:node_at(pos, mode)
 end
 
 -- return the node the snippet jumps to, or nil if there isn't one.
