@@ -654,29 +654,6 @@ function Snippet:trigger_expand(current_node, pos_id, env)
 	if parent_snippet then
 		-- if found, find node to insert at, prefer receiving a linkable node.
 		parent_node = parent_snippet:node_at(pos, node_util.binarysearch_preference.linkable)
-		-- it may happen, that the cursor is on the boundary of an insertNode
-		-- and a textNode, and binarysearch_pos finds the textNode.
-		-- Since this is undesirable, we check for this case here, and instead
-		-- continue the search in the adjacent
-		-- insertNode/choiceNode/dynamicNode/...
-		-- This is only a simple heuristic, and does not handle cases where the
-		-- adjacent choiceNode (for example) does not actually contain an
-		-- insertNode.
-		-- Still, any node-type is preferable to textNode and functionNode,
-		-- both of which cannot handle snippets inserted into them.
-		while parent_node and (parent_node.type == types.textNode or parent_node.type == types.functionNode) do
-			-- if the snippet is expanded at a text or functionNode, check if
-			-- there is an adjacent insert/exitNode we could instead look into.
-			local from, to = parent_node.mark:pos_begin_end_raw()
-			local alt_node_indx = util.pos_equal(from, pos) and parent_node.indx-1 or (util.pos_equal(to, pos) and parent_node.indx+1 or -1)
-			local alt_node = parent_node.parent.nodes[alt_node_indx]
-			if alt_node and (alt_node.type ~= types.textNode and alt_node.type ~= types.functionNode) then
-				-- continue search in alternative node.
-				parent_node = alt_node:node_at(pos, node_util.binarysearch_preference.linkable)
-			else
-				break
-			end
-		end
 	end
 	if current_node then
 		node_util.refocus(current_node, parent_node)
