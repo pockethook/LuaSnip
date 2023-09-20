@@ -507,7 +507,12 @@ local function refocus(from, to)
 	-- this leave, and the following enters should be safe: the path to `to`
 	-- was verified via extmarks_valid.
 	if common_node and final_leave_node then
-		final_leave_node:input_leave_children()
+		-- if the final_leave_node is from, its children are not active (which
+		-- stems from the requirement that from is the currently active node),
+		-- and so don't have to be left.
+		if final_leave_node ~= from then
+			final_leave_node:input_leave_children()
+		end
 		leave_nodes_between(common_node, final_leave_node, true)
 	end
 
@@ -520,14 +525,21 @@ local function refocus(from, to)
 		-- explicitly activate the snippet for all jumps to behave correctly.
 		-- (if we enter a i(0)/i(-1), this is not necessary, of course).
 		if final_leave_node.type == types.exitNode and first_enter_node.type ~= types.exitNode then
-			common_node:input_enter()
+			common_node:input_enter(true)
 		end
 		-- symmetrically, entering an i(0)/i(-1) requires leaving the snippet.
 		if final_leave_node.type ~= types.exitNode and first_enter_node.type == types.exitNode then
-			common_node:input_leave()
+			common_node:input_leave(true)
 		end
+
 		enter_nodes_between(common_node, first_enter_node, true)
-		first_enter_node:input_enter_children()
+
+		-- if the `first_enter_node` is already `to` (occurs if `to` is in the
+		-- common snippet of to and from), we should not enter its children.
+		-- (we only want to `input_enter` to.)
+		if first_enter_node ~= to then
+			first_enter_node:input_enter_children()
+		end
 	end
 
 	-- same here, input_enter_children has to be called manually for the
@@ -541,9 +553,8 @@ local function refocus(from, to)
 		node:input_enter_children()
 	end
 	if #to_snip_path > 0 then
-		-- we know that the first node is from.
-		enter_nodes_between(to.parent.snippet, to, true)
 		to.parent.snippet:input_enter(true)
+		enter_nodes_between(to.parent.snippet, to, enter_no_move)
 	end
 end
 
