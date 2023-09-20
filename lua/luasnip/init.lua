@@ -728,6 +728,32 @@ local function clean_invalidated(opts)
 	snippet_collection.clean_invalidated(opts)
 end
 
+local function activate_node(pos)
+	pos = pos or util.get_cursor_0ind()
+
+	-- find tree-node the snippet should be inserted at (could be before another node).
+	local _, _, _, node = node_util.snippettree_find_node(pos, {
+		tree_respect_rgravs = true,
+		tree_preference = node_util.binarysearch_preference.inside,
+		snippet_preference = node_util.binarysearch_preference.interactive
+	})
+
+	-- only activate interactive nodes, or nodes that are immediately nested
+	-- inside a choiceNode.
+	if not node_util.interactive_node(node) and rawget(node, "choice") == nil then
+		print("Refusing to activate a non-interactive node.")
+		return
+	end
+
+	node_util.refocus(session.current_nodes[vim.api.nvim_get_current_buf()], node)
+	-- input_enter node again, to get highlight and the like.
+	-- One side-effect of this is that an event will be execute twice, but I
+	-- feel like that is a trade-off worth doing, since it otherwise refocus
+	-- would have to be more complicated (or at least, restructured).
+	node:input_enter()
+	session.current_nodes[vim.api.nvim_get_current_buf()] = node
+end
+
 -- make these lazy, such that we don't have to load them before it's really
 -- necessary (drives up cost of initial load, otherwise).
 -- stylua: ignore
@@ -799,6 +825,7 @@ ls = util.lazy_table({
 	setup = require("luasnip.config").setup,
 	extend_decorator = extend_decorator,
 	log = require("luasnip.util.log"),
+	activate_node = activate_node
 }, ls_lazy)
 
 return ls

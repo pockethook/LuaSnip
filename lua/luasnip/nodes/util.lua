@@ -222,6 +222,9 @@ local binarysearch_preference = {
 	outside = function(cmp_mid_to, cmp_mid_from, _)
 		return cmp_mid_to >= 0, cmp_mid_from <= 0
 	end,
+	inside = function(cmp_mid_to, cmp_mid_from, _)
+		return cmp_mid_to >= 0, cmp_mid_from <= 0
+	end,
 	linkable = prefer_nodes(linkable_node, non_linkable_node),
 	interactive = prefer_nodes(interactive_node, non_interactive_node)
 }
@@ -634,5 +637,6 @@ return {
 	binarysearch_preference = binarysearch_preference,
 	refocus = refocus,
 	generic_extmarks_valid = generic_extmarks_valid,
-	snippettree_find_node = snippettree_find_node
+	snippettree_find_node = snippettree_find_node,
+	interactive_node = interactive_node
 }
