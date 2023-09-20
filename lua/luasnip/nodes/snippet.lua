@@ -467,43 +467,6 @@ local function ISN(pos, nodes, indent_text, opts)
 end
 extend_decorator.register(ISN, { arg_indx = 4 })
 
--- returns: * the smallest known snippet this pos is inside.
---          * the list of other snippets inside the snippet of this smallest
---            node
---          * the index this snippet would be at if inserted into that list
-local function find_snippettree_position(pos)
-	local prev_parent = nil
-	local prev_parent_children = session.snippet_roots[vim.api.nvim_get_current_buf()]
-
-	while true do
-		-- false: don't respect rgravs.
-		-- Prefer inserting the snippet outside an existing one.
-		local found_parent, child_indx = node_util.binarysearch_pos(prev_parent_children, pos, false, node_util.binarysearch_preference.outside)
-		if found_parent == false then
-			-- if the procedure returns false, there was an error getting the
-			-- position of a node (in this case, that node is a snippet).
-			-- The position of the offending snippet is returned in child_indx,
-			-- and we can remove it here.
-			prev_parent_children[child_indx]:remove_from_jumplist()
-		elseif (found_parent ~= nil and not found_parent:extmarks_valid()) then
-			-- found snippet damaged (the idea to sidestep the damaged snippet,
-			-- even if no error occurred _right now_, is to ensure that we can
-			-- input_enter all the nodes along the insertion-path correctly).
-			found_parent:remove_from_jumplist()
-			-- continue again with same parent, but one less snippet in its
-			-- children => shouldn't cause endless loop.
-		elseif found_parent == nil then
-			-- prev_parent is nil if this snippet is expanded at the top-level.
-			return prev_parent, prev_parent_children, child_indx
-		else
-			prev_parent = found_parent
-			-- can index prev_parent, since found_parent is not nil, and
-			-- assigned to prev_parent.
-			prev_parent_children = prev_parent.child_snippets
-		end
-	end
-end
-
 function Snippet:remove_from_jumplist()
 	if not self.visible then
 		-- snippet not visible => already removed.
@@ -648,13 +611,12 @@ end
 function Snippet:trigger_expand(current_node, pos_id, env)
 	local pos = vim.api.nvim_buf_get_extmark_by_id(0, session.ns_id, pos_id, {})
 
-	local parent_snippet, sibling_snippets, own_indx, parent_node
 	-- find tree-node the snippet should be inserted at (could be before another node).
-	parent_snippet, sibling_snippets, own_indx = find_snippettree_position(pos)
-	if parent_snippet then
-		-- if found, find node to insert at, prefer receiving a linkable node.
-		parent_node = parent_snippet:node_at(pos, node_util.binarysearch_preference.linkable)
-	end
+	local _, sibling_snippets, own_indx, parent_node = node_util.snippettree_find_node(pos, {
+		tree_respect_rgravs = false,
+		tree_preference = node_util.binarysearch_preference.outside,
+		snippet_preference = node_util.binarysearch_preference.linkable
+	})
 	if current_node then
 		node_util.refocus(current_node, parent_node)
 		if parent_node then

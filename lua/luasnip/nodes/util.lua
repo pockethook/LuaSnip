@@ -2,6 +2,7 @@ local util = require("luasnip.util.util")
 local ext_util = require("luasnip.util.ext_opts")
 local types = require("luasnip.util.types")
 local key_indexer = require("luasnip.nodes.key_indexer")
+local session = require("luasnip.session")
 
 local function subsnip_init_children(parent, children)
 	for _, child in ipairs(children) do
@@ -559,6 +560,51 @@ local function generic_extmarks_valid(node, child)
 	return child:extmarks_valid()
 end
 
+-- returns: * the smallest known snippet `pos` is inside.
+--          * the list of other snippets inside the snippet of this smallest
+--            node
+--          * the index this snippet would be at if inserted into that list
+--          * the node of this snippet pos is on.
+local function snippettree_find_node(pos, opts)
+	local prev_parent, child_indx, found_parent
+	local prev_parent_children = session.snippet_roots[vim.api.nvim_get_current_buf()]
+
+	while true do
+		-- false: don't respect rgravs.
+		-- Prefer inserting the snippet outside an existing one.
+		found_parent, child_indx = binarysearch_pos(prev_parent_children, pos, opts.tree_respect_rgravs, opts.tree_preference)
+		if found_parent == false then
+			-- if the procedure returns false, there was an error getting the
+			-- position of a node (in this case, that node is a snippet).
+			-- The position of the offending snippet is returned in child_indx,
+			-- and we can remove it here.
+			prev_parent_children[child_indx]:remove_from_jumplist()
+		elseif (found_parent ~= nil and not found_parent:extmarks_valid()) then
+			-- found snippet damaged (the idea to sidestep the damaged snippet,
+			-- even if no error occurred _right now_, is to ensure that we can
+			-- input_enter all the nodes along the insertion-path correctly).
+			found_parent:remove_from_jumplist()
+			-- continue again with same parent, but one less snippet in its
+			-- children => shouldn't cause endless loop.
+		elseif found_parent == nil then
+			break
+		else
+			prev_parent = found_parent
+			-- can index prev_parent, since found_parent is not nil, and
+			-- assigned to prev_parent.
+			prev_parent_children = prev_parent.child_snippets
+		end
+	end
+
+	local node
+	if prev_parent then
+		-- if found, find node to insert at, prefer receiving a linkable node.
+		node = prev_parent:node_at(pos, opts.snippet_preference)
+	end
+
+	return prev_parent, prev_parent_children, child_indx, node
+end
+
 return {
 	subsnip_init_children = subsnip_init_children,
 	init_child_positions_func = init_child_positions_func,
@@ -576,5 +622,6 @@ return {
 	binarysearch_pos = binarysearch_pos,
 	binarysearch_preference = binarysearch_preference,
 	refocus = refocus,
-	generic_extmarks_valid = generic_extmarks_valid
+	generic_extmarks_valid = generic_extmarks_valid,
+	snippettree_find_node = snippettree_find_node
 }
