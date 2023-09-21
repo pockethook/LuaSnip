@@ -238,7 +238,8 @@ describe("snippets_basic", function()
 			unchanged = true,
 		})
 
-		-- jump back before outer.
+		-- jump back through outer.
+		-- (can no longer enter it through connections to other snippet)
 		exec_lua("ls.jump(-1)")
 		screen:expect({
 			grid = [[
@@ -247,15 +248,26 @@ describe("snippets_basic", function()
 			{2:-- INSERT --}                                      |]],
 			unchanged = true,
 		})
-		-- the snippet is not active anymore (cursor position doesn't change from last expansion).
+		-- last snippet is not forgotten (yet).
 		exec_lua("ls.jump(1)")
-		screen:expect({
-			grid = [[
-			^a[a[]ab]ab                                        |
+		screen:expect{grid=[[
+			a[^a{3:[]ab}]ab                                        |
 			{0:~                                                 }|
-			{2:-- INSERT --}                                      |]],
-			unchanged = true,
-		})
+			{2:-- SELECT --}                                      |]]}
+
+		feed("<Esc>o")
+		exec_lua("ls.snip_expand(" .. snip .. ")")
+		screen:expect{grid=[[
+			a[a[]ab]ab                                        |
+			a[^]ab                                             |
+			{2:-- INSERT --}                                      |]]}
+		exec_lua("ls.jump(-1) ls.jump(-1)")
+
+		-- first snippet can't be accessed anymore.
+		screen:expect{grid=[[
+			a[a[]ab]ab                                        |
+			^a[]ab                                             |
+			{2:-- INSERT --}                                      |]]}
 	end)
 
 	it("history=true allows jumping back into exited snippet.", function()
@@ -588,40 +600,32 @@ describe("snippets_basic", function()
 				t"sometext", i(1, "someinsertnode")
 			}))
 		]])
-		screen:expect({
-			grid = [[
-  sometext^s{3:omeinsertnode}                            |
-  {0:~                                                 }|
-  {2:-- SELECT --}                                      |
-]],
+		screen:expect({ grid = [[
+			sometext^s{3:omeinsertnode}                            |
+			{0:~                                                 }|
+			{2:-- SELECT --}                                      |]],
 		})
 		-- leave snippet-area, and trigger insertLeave.
 		feed("<Esc>o<Esc>")
-		screen:expect({
-			grid = [[
-  sometextsomeinsertnode                            |
-  ^                                                  |
-                                                    |
-]],
+		screen:expect({ grid = [[
+			sometextsomeinsertnode                            |
+			^                                                  |
+			                                                  |]],
 		})
 		-- make sure we're in the last tabstop (ie. region_check_events did its
 		-- job).
 		exec_lua("ls.jump(1)")
-		screen:expect({
-			grid = [[
-  sometextsomeinsertnode                            |
-  ^                                                  |
-                                                    |
-]],
+		screen:expect({ grid = [[
+			sometextsomeinsertnode                            |
+			^                                                  |
+			                                                  |]],
 		})
 		-- not really necessary, but feels safer this way.
 		exec_lua("ls.jump(-1)")
-		screen:expect({
-			grid = [[
-  sometext^s{3:omeinsertnode}                            |
-                                                    |
-  {2:-- SELECT --}                                      |
-]],
+		screen:expect({ grid = [[
+			sometext^s{3:omeinsertnode}                            |
+			                                                  |
+			{2:-- SELECT --}                                      |]],
 		})
 
 		-- delete snippet text
