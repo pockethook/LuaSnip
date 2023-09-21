@@ -557,7 +557,7 @@ local function refocus(from, to)
 	end
 	if #to_snip_path > 0 then
 		to.parent.snippet:input_enter(true)
-		enter_nodes_between(to.parent.snippet, to, enter_no_move)
+		enter_nodes_between(to.parent.snippet, to, true)
 	end
 end
 
