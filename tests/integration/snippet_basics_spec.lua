@@ -1192,4 +1192,46 @@ describe("snippets_basic", function()
 			{2:-- INSERT --}                                      |]],
 		})
 	end)
+
+	it("Nested $0 remains active if there is no real next node.", function()
+		exec_lua([[
+			ls.add_snippets("all", {
+				s("aa", { i(1, "a:"), t"(", i(0), t")" })
+			})
+		]])
+
+		-- expand nested.
+		feed("iaa")
+		exec_lua([[ ls.expand() ]])
+		exec_lua([[ ls.jump(1) ]])
+		screen:expect{grid=[[
+			a:(^)                                              |
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+
+		feed("aa")
+		exec_lua([[ ls.expand() ]])
+		exec_lua([[ ls.jump(1) ]])
+		screen:expect{grid=[[
+			a:(a:(^))                                          |
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+
+		feed("aa")
+		exec_lua([[ ls.expand() ]])
+		exec_lua([[ ls.jump(1) ]])
+		screen:expect{grid=[[
+			a:(a:(a:(^)))                                      |
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+
+		-- jump should not move cursor!
+		-- for some reason need multiple jumps to trigger the mistake.
+		exec_lua([[ ls.jump(1)]])
+		exec_lua([[ ls.jump(1)]])
+		screen:expect{grid=[[
+			a:(a:(a:(^)))                                      |
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+	end)
 end)

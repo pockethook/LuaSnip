@@ -183,34 +183,52 @@ function InsertNode:jump_into(dir, no_move, dry_run)
 	end
 end
 
+function ExitNode:jump_from(dir, no_move, dry_run)
+	self:init_dry_run_inner_active(dry_run)
+
+	local next_node = util.ternary(dir == 1, self.next, self.prev)
+	local next_inner_node = util.ternary(dir == 1, self.inner_first, self.inner_last)
+
+	if next_inner_node then
+		self:input_enter_children(dry_run)
+		return next_inner_node:jump_into(dir, no_move, dry_run)
+	else
+		if next_node then
+			local next_node_dry_run = { active = {} }
+			-- don't have to `init_dry_run_inner_active` since this node does
+			-- not have children active if jump_from is called.
+
+			-- true: don't move
+			local target_node = next_node:jump_into(dir, true, next_node_dry_run)
+			-- if there is no node that can serve as jump-target, just remain
+			-- here.
+			-- Regular insertNodes don't have to handle this, since there is
+			-- always an exitNode or another insertNode at their endpoints.
+			if not target_node then
+				return self
+			end
+
+			self:input_leave(no_move, dry_run)
+			return next_node:jump_into(dir, no_move, dry_run) or self
+		else
+			return self
+		end
+	end
+end
+
 function InsertNode:jump_from(dir, no_move, dry_run)
 	self:init_dry_run_inner_active(dry_run)
 
-	if dir == 1 then
-		if self.inner_first then
-			self:input_enter_children(dry_run)
-			return self.inner_first:jump_into(dir, no_move, dry_run)
-		else
-			if self.next then
-				self:input_leave(no_move, dry_run)
-				return self.next:jump_into(dir, no_move, dry_run) or self
-			else
-				-- only happens for exitNodes, but easier to include here
-				-- and reuse this impl for them.
-				return self
-			end
-		end
+	local next_node = util.ternary(dir == 1, self.next, self.prev)
+	local next_inner_node = util.ternary(dir == 1, self.inner_first, self.inner_last)
+
+	if next_inner_node then
+		self:input_enter_children(dry_run)
+		return next_inner_node:jump_into(dir, no_move, dry_run)
 	else
-		if self.inner_last then
-			self:input_enter_children(dry_run)
-			return self.inner_last:jump_into(dir, no_move, dry_run)
-		else
-			if self.prev then
-				self:input_leave(no_move, dry_run)
-				return self.prev:jump_into(dir, no_move, dry_run) or self
-			else
-				return self
-			end
+		if next_node then
+			self:input_leave(no_move, dry_run)
+			return next_node:jump_into(dir, no_move, dry_run)
 		end
 	end
 end
