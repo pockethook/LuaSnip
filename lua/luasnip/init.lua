@@ -567,32 +567,12 @@ local function unlink_current_if_deleted()
 		return
 	end
 	local snippet = node.parent.snippet
-	local ok, snip_begin_pos, snip_end_pos =
-		pcall(snippet.mark.pos_begin_end_raw, snippet.mark)
 
-	if not ok then
-		log.warn("Error while getting extmark-position: %s", snip_begin_pos)
-	end
-
-	-- stylua: ignore
-	-- leave snippet if empty:
-	if not ok or
-		-- either exactly the same position...
-		(snip_begin_pos[1] == snip_end_pos[1] and
-		 snip_begin_pos[2] == snip_end_pos[2]) or
-		-- or the end-mark is one line below and there is no text between them.
-		-- (this can happen when deleting linewise-visual or via `dd`)
-		(snip_begin_pos[1]+1 == snip_end_pos[1] and
-		 snip_end_pos[2] == 0 and
-
-		 #vim.api.nvim_buf_get_lines(0, snip_begin_pos[1], snip_begin_pos[1]+1, true)[1] == 0) then
-
-		log.info("Detected deletion of snippet `%s`, removing it", snippet.trigger)
-
-		session.current_nodes[vim.api.nvim_get_current_buf()] =
-			-- either pick i0 of snippet before, or i(-1) of next snippet.
-			snippet.prev.prev or snippet:next_node()
-		snippet:remove_from_jumplist()
+	-- extmarks_valid checks that
+	-- * textnodes that should contain text still do so, and
+	-- * that extmarks still fulfill all expectations (should be successive, no gaps, etc.)
+	if not snippet:extmarks_valid() then
+		unlink_set_adjacent_as_current(snippet, "Detected deletion of snippet `%s`, removing it", snippet.trigger)
 	end
 end
 
