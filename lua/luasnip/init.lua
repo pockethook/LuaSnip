@@ -589,6 +589,12 @@ local function exit_out_of_region(node)
 	else
 		snippet = node.parent.snippet
 	end
+
+	-- find root-snippet.
+	while snippet.parent_node do
+		snippet = snippet.parent_node.parent.snippet
+	end
+
 	local ok, snip_begin_pos, snip_end_pos =
 		pcall(snippet.mark.pos_begin_end, snippet.mark)
 
@@ -603,15 +609,13 @@ local function exit_out_of_region(node)
 		pos[1] < snip_begin_pos[1] or
 		pos[1] > snip_end_pos[1] then
 
-		-- true: set no_move
-		local leave_ok, errmsg = pcall(node_util.leave_nodes_between, snippet, node, true)
-		if not leave_ok then
-			remove_snip_set_adjacent_as_current(snippet, "Error while leaving nodes: %s", errmsg)
-			return
-		end
+		-- completely leave root-snippet.
+		node_util.refocus(node, nil)
+
 		-- leave_nodes_between does not leave snippet, have to do this
 		-- here.
-		leave_ok, errmsg = pcall(snippet.input_leave, snippet, true)
+		-- true: set no_move
+		local leave_ok, errmsg = pcall(snippet.input_leave, snippet, true)
 		if not leave_ok then
 			unlink_set_adjacent_as_current(snippet, "Error while leaving nodes: %s", errmsg)
 			return

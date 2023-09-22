@@ -3441,14 +3441,11 @@ These are the settings you can provide to `luasnip.setup()`:
   returned.
 
 - `exit_out_of_region(node)`: checks whether the cursor is still within the
-  range of the snippet `node` belongs to. If yes, no change occurs; if no, the
-  snippet is exited and following snippets' regions are checked and potentially
-  exited (the next active node will be the 0-node of the snippet before the one
-  the cursor is inside.
-  If the cursor isn't inside any snippet, the active node will be the last node
-  in the jumplist).
-  If a jump causes an error (happens mostly because a snippet was deleted), the
-  snippet is removed from the jumplist.
+  range of the root-snippet `node` belongs to. If yes, no change occurs; if no, the
+  root-snippet is exited and its `$0` will be the new active node.  
+  If a jump causes an error (happens mostly because the text of a snippet was
+  deleted), the snippet is removed from the jumplist and the current node set to
+  the end/beginning of the next/previous snippet.
 
 - `store_snippet_docstrings(snippet_table)`: Stores the docstrings of all
   snippets in `snippet_table` to a file
