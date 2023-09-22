@@ -732,7 +732,7 @@ local function activate_node(pos)
 	pos = pos or util.get_cursor_0ind()
 
 	-- find tree-node the snippet should be inserted at (could be before another node).
-	local _, _, _, node = node_util.snippettree_find_node(pos, {
+	local _, _, _, node = node_util.snippettree_find_undamaged_node(pos, {
 		tree_respect_rgravs = true,
 		tree_preference = node_util.binarysearch_preference.inside,
 		snippet_preference = node_util.binarysearch_preference.interactive

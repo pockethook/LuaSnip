@@ -579,7 +579,7 @@ end
 --            node
 --          * the index this snippet would be at if inserted into that list
 --          * the node of this snippet pos is on.
-local function snippettree_find_node(pos, opts)
+local function snippettree_find_undamaged_node(pos, opts)
 	local prev_parent, child_indx, found_parent
 	local prev_parent_children = session.snippet_roots[vim.api.nvim_get_current_buf()]
 
@@ -637,6 +637,6 @@ return {
 	binarysearch_preference = binarysearch_preference,
 	refocus = refocus,
 	generic_extmarks_valid = generic_extmarks_valid,
-	snippettree_find_node = snippettree_find_node,
+	snippettree_find_undamaged_node = snippettree_find_undamaged_node,
 	interactive_node = interactive_node
 }

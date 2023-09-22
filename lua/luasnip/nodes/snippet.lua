@@ -612,7 +612,7 @@ function Snippet:trigger_expand(current_node, pos_id, env)
 	local pos = vim.api.nvim_buf_get_extmark_by_id(0, session.ns_id, pos_id, {})
 
 	-- find tree-node the snippet should be inserted at (could be before another node).
-	local _, sibling_snippets, own_indx, parent_node = node_util.snippettree_find_node(pos, {
+	local _, sibling_snippets, own_indx, parent_node = node_util.snippettree_find_undamaged_node(pos, {
 		tree_respect_rgravs = false,
 		tree_preference = node_util.binarysearch_preference.outside,
 		snippet_preference = node_util.binarysearch_preference.linkable
