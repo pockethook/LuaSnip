@@ -90,6 +90,7 @@ end
 
 -- assumes that children of child are not even active.
 -- If they should also be left, do that separately.
+-- Does not leave the parent.
 local function leave_nodes_between(parent, child, no_move)
 	local nodes = get_nodes_between(parent, child)
 	if #nodes == 0 then
@@ -492,6 +493,10 @@ local function refocus(from, to)
 	if #from_snip_path > 0 then
 		-- we know that the first node is from.
 		local ok1 = pcall(leave_nodes_between, from.parent.snippet, from, true)
+		-- leave_nodes_between does not affect snippet, so that has to be left
+		-- here.
+		-- snippet does not have input_leave_children, so only input_leave
+		-- needs to be called.
 		local ok2 = pcall(from.parent.snippet.input_leave, from.parent.snippet, true)
 		if not ok1 or not ok2 then
 			from.parent.snippet:remove_from_jumplist()
@@ -508,7 +513,7 @@ local function refocus(from, to)
 	end
 
 	-- this leave, and the following enters should be safe: the path to `to`
-	-- was verified via extmarks_valid.
+	-- was verified via extmarks_valid (precondition).
 	if common_node and final_leave_node then
 		-- if the final_leave_node is from, its children are not active (which
 		-- stems from the requirement that from is the currently active node),
@@ -551,12 +556,20 @@ local function refocus(from, to)
 
 	for i = #to_snip_path, 2, -1 do
 		local node = to_snip_path[i]
-		node.parent.snippet:input_enter(true)
+		if node.type ~= types.exitNode then
+			node.parent.snippet:input_enter(true)
+		else
+			to.parent.snippet:input_leave(true)
+		end
 		enter_nodes_between(node.parent.snippet, node, true)
 		node:input_enter_children()
 	end
 	if #to_snip_path > 0 then
-		to.parent.snippet:input_enter(true)
+		if to.type ~= types.exitNode then
+			to.parent.snippet:input_enter(true)
+		else
+			to.parent.snippet:input_leave(true)
+		end
 		enter_nodes_between(to.parent.snippet, to, true)
 	end
 end
