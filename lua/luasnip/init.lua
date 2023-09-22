@@ -86,19 +86,37 @@ local function available(snip_info)
 	return res
 end
 
-local function unlink_current()
-	local node = session.current_nodes[vim.api.nvim_get_current_buf()]
-	if not node then
-		print("No active Snippet")
-		return
-	end
-	local snippet = node.parent.snippet
-
+local function unlink_set_adjacent_as_current_no_log(snippet)
 	-- prefer setting previous/outer insertNode as current node.
-	session.current_nodes[vim.api.nvim_get_current_buf()] =
+	local next_current =
 		-- either pick i0 of snippet before, or i(-1) of next snippet.
 		snippet.prev.prev or snippet:next_node()
 	snippet:remove_from_jumplist()
+
+	if next_current then
+		-- if snippet was active before, we need to now set its parent to be no
+		-- longer inner_active.
+		if snippet.parent_node == next_current and next_current.inner_active then
+			snippet.parent_node:input_leave_children()
+		else
+			-- set no_move.
+			next_current:input_enter(true)
+		end
+	end
+
+	session.current_nodes[vim.api.nvim_get_current_buf()] = next_current
+end
+local function unlink_set_adjacent_as_current(snippet, reason, ...)
+	log.warn("Removing snippet %s: %s", snippet.trigger, reason:format(...))
+	unlink_set_adjacent_as_current_no_log(snippet)
+end
+local function unlink_current()
+	local current = session.current_nodes[vim.api.nvim_get_current_buf()]
+	if not current then
+		print("No active Snippet")
+		return
+	end
+	unlink_set_adjacent_as_current_no_log()
 end
 
 local function safe_jump_current(dir, no_move, dry_run)
@@ -112,9 +130,8 @@ local function safe_jump_current(dir, no_move, dry_run)
 		return res
 	else
 		local snip = node.parent.snippet
-		log.warn("Removing snippet `%s` due to error %s", snip.trigger, res)
 
-		unlink_current()
+		unlink_set_adjacent_as_current(snip, "Removing snippet `%s` due to error %s", snip.trigger, res)
 		return session.current_nodes[vim.api.nvim_get_current_buf()]
 	end
 end
@@ -158,11 +175,10 @@ local function in_snippet()
 	local ok, snip_begin_pos, snip_end_pos =
 		pcall(snippet.mark.pos_begin_end, snippet.mark)
 	if not ok then
-		log.warn("Error while getting extmark-position: %s", snip_begin_pos)
 		-- if there was an error getting the position, the snippets text was
 		-- most likely removed, resulting in messed up extmarks -> error.
 		-- remove the snippet.
-		unlink_current()
+		unlink_set_adjacent_as_current(snippet, "Error while getting extmark-position: %s", snip_begin_pos)
 		return
 	end
 	local pos = vim.api.nvim_win_get_cursor(0)
@@ -369,11 +385,11 @@ local function safe_choice_action(snip, ...)
 	if ok then
 		return res
 	else
-		log.warn("Removing snippet `%s` due to error %s", snip.trigger, res)
+		log.warn()
 
 		-- not very elegant, but this way we don't have a near
 		-- re-implementation of unlink_current.
-		unlink_current()
+		unlink_set_adjacent_as_current(snip, "Removing snippet `%s` due to error %s", snip.trigger, res)
 		return session.current_nodes[vim.api.nvim_get_current_buf()]
 	end
 end
@@ -443,23 +459,23 @@ local function active_update_dependents()
 		local ok, err = pcall(active.update_dependents, active)
 		if not ok then
 			log.warn(
+			)
+			unlink_set_adjacent_as_current(active.parent.snippet,
 				"Error while updating dependents for snippet %s due to error %s",
 				active.parent.snippet.trigger,
-				err
-			)
-			unlink_current()
+				err)
 			return
 		end
 
 		-- 'restore' orientation of extmarks, may have been changed by some set_text or similar.
 		ok, err = pcall(active.focus, active)
 		if not ok then
-			log.warn(
+			unlink_set_adjacent_as_current(active.parent.snippet,
 				"Error while entering node in snippet %s: %s",
 				active.parent.snippet.trigger,
 				err
 			)
-			unlink_current()
+
 			return
 		end
 
@@ -580,14 +596,6 @@ local function unlink_current_if_deleted()
 	end
 end
 
-local function remove_snip_set_adjacent_as_current(snippet, reason, ...)
-	log.warn("Removing snippet %s: %s", snippet.trigger, reason:format(...))
-	-- first adjust current node, remove_from_jumplist will change next/prev!
-	session.current_nodes[vim.api.nvim_get_current_buf()] =
-		-- either pick i0 of snippet before, or i(-1) of next snippet.
-		snippet.prev.prev or snippet:next_node()
-	snippet:remove_from_jumplist()
-end
 local function exit_out_of_region(node)
 	-- if currently jumping via luasnip or no active node:
 	if session.jump_active or not node then
@@ -605,7 +613,7 @@ local function exit_out_of_region(node)
 		pcall(snippet.mark.pos_begin_end, snippet.mark)
 
 	if not ok then
-		remove_snip_set_adjacent_as_current(snippet, "Error while getting extmark-position: %s", snip_begin_pos)
+		unlink_set_adjacent_as_current(snippet, "Error while getting extmark-position: %s", snip_begin_pos)
 		return
 	end
 
@@ -625,7 +633,7 @@ local function exit_out_of_region(node)
 		-- here.
 		leave_ok, errmsg = pcall(snippet.input_leave, snippet, true)
 		if not leave_ok then
-			remove_snip_set_adjacent_as_current(snippet, "Error while leaving nodes: %s", errmsg)
+			unlink_set_adjacent_as_current(snippet, "Error while leaving nodes: %s", errmsg)
 			return
 		end
 
