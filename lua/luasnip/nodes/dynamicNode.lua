@@ -119,6 +119,10 @@ function DynamicNode:update()
 		return
 	end
 
+	if not self.parent.snippet:extmarks_valid() then
+		error("Refusing to update a snippet with invalid extmarks")
+	end
+
 	local tmp
 	if self.snip then
 		if not args then
@@ -428,7 +432,10 @@ function DynamicNode:node_at(pos, mode)
 end
 
 function DynamicNode:extmarks_valid()
-	return node_util.generic_extmarks_valid(self, self.snip)
+	if self.snip then
+		return node_util.generic_extmarks_valid(self, self.snip)
+	end
+	return true
 end
 
 return {
