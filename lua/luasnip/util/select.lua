@@ -22,7 +22,6 @@ function M.retrieve()
 	return {}, {}, {}
 end
 
-
 local function get_min_indent(lines)
 	-- "^(%s*)%S": match only lines that actually contain text.
 	local min_indent = lines[1]:match("^(%s*)%S")
@@ -40,14 +39,13 @@ local function get_min_indent(lines)
 	return min_indent
 end
 
-
 local function store_registers(...)
-	local names = {...}
+	local names = { ... }
 	local restore_data = {}
 	for _, name in ipairs(names) do
 		restore_data[name] = {
 			data = vim.fn.getreg(name),
-			type = vim.fn.getregtype(name)
+			type = vim.fn.getregtype(name),
 		}
 	end
 	return restore_data
@@ -61,7 +59,8 @@ end
 
 -- subtle: `:lua` exits VISUAL, which means that the '< '>-marks will be set correctly!
 -- Afterwards, we can just use <cmd>lua, which does not change the mode.
-M.select_keys = [[:lua require("luasnip.util.select").pre_cut()<Cr>gv"zs<cmd>lua require('luasnip.util.select').post_cut("z")<Cr>]]
+M.select_keys =
+	[[:lua require("luasnip.util.select").pre_cut()<Cr>gv"zs<cmd>lua require('luasnip.util.select').post_cut("z")<Cr>]]
 
 local saved_registers
 local lines
@@ -69,12 +68,25 @@ local start_line, start_col, end_line, end_col
 local mode
 function M.pre_cut()
 	-- store registers so we don't change any of them.
-	saved_registers = store_registers("", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "z")
+	saved_registers = store_registers(
+		"",
+		"1",
+		"2",
+		"3",
+		"4",
+		"5",
+		"6",
+		"7",
+		"8",
+		"9",
+		"-",
+		"z"
+	)
 
 	-- store data needed for de-indenting lines.
-	start_line = vim.fn.line("'<")-1
+	start_line = vim.fn.line("'<") - 1
 	start_col = vim.fn.col("'<")
-	end_line = vim.fn.line("'>")-1
+	end_line = vim.fn.line("'>") - 1
 	end_col = vim.fn.col("'>")
 	-- +1: include final line.
 	lines = vim.api.nvim_buf_get_lines(0, start_line, end_line + 1, true)
@@ -99,7 +111,7 @@ function M.post_cut(register_name)
 		end
 		-- due to the trailing newline of the last line, and vim.split's
 		-- behaviour, the last line of `chunks` is always empty.
-		-- Keep this 
+		-- Keep this
 	elseif mode == "v" then
 		-- if selection starts inside indent, remove indent.
 		if #min_indent > start_col then
