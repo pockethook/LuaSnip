@@ -245,10 +245,6 @@ function InsertNode:input_leave_children(dry_run)
 		dry_run.active[self] = false
 	else
 		self.inner_active = false
-		if not session.config.history then
-			self.inner_first = nil
-			self.inner_last = nil
-		end
 	end
 end
 

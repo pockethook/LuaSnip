@@ -253,7 +253,7 @@ local function snip_expand(snippet, opts)
 		opts.jump_into_func(snip)
 
 	local buf_snippet_roots = session.snippet_roots[vim.api.nvim_get_current_buf()]
-	if not session.config.history and #buf_snippet_roots > 1 then
+	if not session.config.keep_roots and #buf_snippet_roots > 1 then
 		-- if history is not set, and there is more than one snippet-root,
 		-- remove the other one.
 		-- The nice thing is: since we maintain that #buf_snippet_roots == 1
@@ -730,10 +730,15 @@ local function activate_node(pos)
 		snippet_preference = node_util.binarysearch_preference.interactive
 	})
 
+	if not node then
+		error("Could not find a node at that position.")
+		return
+	end
+
 	-- only activate interactive nodes, or nodes that are immediately nested
 	-- inside a choiceNode.
 	if not node_util.interactive_node(node) and rawget(node, "choice") == nil then
-		print("Refusing to activate a non-interactive node.")
+		error("Refusing to activate a non-interactive node.")
 		return
 	end
 

@@ -536,72 +536,70 @@ local function insert_into_jumplist(snippet, start_node, current_node, parent_no
 		next = next_snippet
 	end
 
-	if session.config.history then
-		if parent_node then
-			local can_link_parent_node = node_util.linkable_node(parent_node)
-			-- snippetNode (which has to be empty to be viable here) and
-			-- insertNode can both deal with inserting a snippet inside them
-			-- (ie. hooking it up st. it can be visited after jumping back to
-			-- the snippet of parent).
-			-- in all cases
-			if prev ~= nil then
-				-- if we have a previous snippet we can link to, just do that.
-				prev.next.next = snippet
-				start_node.prev = prev.insert_nodes[0]
-			else
-				if can_link_parent_node then
+	-- whether roots should be linked together.
+	local link_roots = session.config.link_roots
+
+	-- whether children of the same snippet should be linked to their parent
+	-- and eachother.
+	local link_children = session.config.link_children
+
+	if parent_node then
+		local can_link_parent_node = node_util.linkable_node(parent_node)
+		-- snippetNode (which has to be empty to be viable here) and
+		-- insertNode can both deal with inserting a snippet inside them
+		-- (ie. hooking it up st. it can be visited after jumping back to
+		-- the snippet of parent).
+		-- in all cases
+		if link_children and prev ~= nil then
+			-- if we have a previous snippet we can link to, just do that.
+			prev.next.next = snippet
+			start_node.prev = prev.insert_nodes[0]
+		else
+			if can_link_parent_node then
+				-- only jump from parent to child if link_children is set.
+				if link_children then
 					-- prev is nil, but we can link up using the parent.
 					parent_node.inner_first = snippet
-					start_node.prev = parent_node
-				else
-					-- no way to link up, just jump back to current_node, but
-					-- don't jump from current_node to this snippet (I feel
-					-- like that should be good: one can still get back to ones
-					-- previous history, and we don't mess up whatever jumps
-					-- are set up around current_node)
-					start_node.prev = current_node
 				end
-			end
-
-			-- exact same reasoning here as in prev-case above, omitting comments.
-			if next ~= nil then
-				-- jump from next snippets start_node to $0.
-				next.prev.prev = snippet.insert_nodes[0]
-				-- jump from $0 to next snippet (skip its start_node)
-				snippet.insert_nodes[0].next = next
+				-- make sure we can jump back to the parent.
+				start_node.prev = parent_node
 			else
-				if can_link_parent_node then
-					parent_node.inner_last = snippet.insert_nodes[0]
-					snippet.insert_nodes[0].next = parent_node
-				else
-					snippet.insert_nodes[0].next = current_node
-				end
-			end
-		else
-			-- inserted into top-level snippet-forest, just hook up with prev, next.
-			-- prev and next have to be snippets or nil, in this case.
-			if prev ~= nil then
-				prev.next.next = snippet
-				start_node.prev = prev.insert_nodes[0]
-			end
-			if next ~= nil then
-				snippet.insert_nodes[0].next = next
-				next.prev.prev = snippet.insert_nodes[0]
+				-- no way to link up, just jump back to current_node, but
+				-- don't jump from current_node to this snippet (I feel
+				-- like that should be good: one can still get back to ones
+				-- previous history, and we don't mess up whatever jumps
+				-- are set up around current_node)
+				start_node.prev = current_node
 			end
 		end
-	else
-		-- don't store history!
-		-- Implement by only linking if this is expanded inside another node, and then only the outgoing jumps.
-		-- As soon as the i0/start_node is jumped from, this snippet will not be jumped into again.
-		-- (although, it is possible to enter it again, after leaving, by
-		-- expanding a snippet inside it. Not sure if this is undesirable, if
-		-- it is, we'll need to do cleanup, somehow)
-		if parent_node then
-			local can_link_parent_node = node_util.linkable_node(parent_node)
+
+		-- exact same reasoning here as in prev-case above, omitting comments.
+		if link_children and next ~= nil then
+			-- jump from next snippets start_node to $0.
+			next.prev.prev = snippet.insert_nodes[0]
+			-- jump from $0 to next snippet (skip its start_node)
+			snippet.insert_nodes[0].next = next
+		else
 			if can_link_parent_node then
-				start_node.prev = parent_node
+				if link_children then
+					parent_node.inner_last = snippet.insert_nodes[0]
+				end
 				snippet.insert_nodes[0].next = parent_node
+			else
+				snippet.insert_nodes[0].next = current_node
 			end
+		end
+	-- don't link different root-nodes for unlinked_roots.
+	elseif link_roots then
+		-- inserted into top-level snippet-forest, just hook up with prev, next.
+		-- prev and next have to be snippets or nil, in this case.
+		if prev ~= nil then
+			prev.next.next = snippet
+			start_node.prev = prev.insert_nodes[0]
+		end
+		if next ~= nil then
+			snippet.insert_nodes[0].next = next
+			next.prev.prev = snippet.insert_nodes[0]
 		end
 	end
 
