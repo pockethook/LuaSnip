@@ -695,6 +695,7 @@ function Snippet:trigger_expand(current_node, pos_id, env)
 	-- Marks should stay at the beginning of the snippet, only the first mark is needed.
 	start_node.mark = self.nodes[1].mark
 	start_node.pos = -1
+	start_node.absolute_position = {-1}
 	start_node.parent = self
 
 	-- hook up i0 and start_node, and then the snippet itself.
@@ -1223,6 +1224,11 @@ function Snippet:update_all_dependents_static()
 end
 
 function Snippet:resolve_position(position)
+	-- only snippets have -1-node.
+	if position == -1 and self.type == types.snippet then
+		return self.prev
+	end
+
 	return self.nodes[position]
 end
 
