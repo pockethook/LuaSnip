@@ -727,8 +727,10 @@ local function clean_invalidated(opts)
 	snippet_collection.clean_invalidated(opts)
 end
 
-local function activate_node(pos)
-	pos = pos or util.get_cursor_0ind()
+local function activate_node(opts)
+	opts = opts or {}
+	local pos = opts.pos or util.get_cursor_0ind()
+	local strict = vim.F.if_nil(opts.strict, false)
 
 	-- find tree-node the snippet should be inserted at (could be before another node).
 	local _, _, _, node = node_util.snippettree_find_undamaged_node(pos, {
@@ -738,15 +740,30 @@ local function activate_node(pos)
 	})
 
 	if not node then
-		error("Could not find a node at that position.")
+		error("No Snippet at that position")
 		return
 	end
 
 	-- only activate interactive nodes, or nodes that are immediately nested
 	-- inside a choiceNode.
 	if not node_util.interactive_node(node) and rawget(node, "choice") == nil then
-		error("Refusing to activate a non-interactive node.")
-		return
+		if strict then
+			error("Refusing to activate a non-interactive node.")
+			return
+		else
+			-- fall back to known insertNode.
+			-- snippet.insert_nodes[1] may be preferable, but that is not
+			-- certainly an insertNode (and does not even certainly contain an
+			-- insertNode, think snippetNode with only textNode).
+			-- We could *almost* find the first activateable node by
+			-- dry_run-jumping into the snippet, but then we'd also need some
+			-- mechanism for setting the active-state of all nodes to false,
+			-- which we don't yet have.
+			--
+			-- Instead, just choose -1-node, and allow jumps from there, which
+			-- is much simpler.
+			node = node.parent.snippet.prev
+		end
 	end
 
 	node_util.refocus(session.current_nodes[vim.api.nvim_get_current_buf()], node)
