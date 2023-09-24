@@ -86,6 +86,7 @@ local function available(snip_info)
 	return res
 end
 
+local unlink_set_adjacent_as_current
 local function unlink_set_adjacent_as_current_no_log(snippet)
 	-- prefer setting previous/outer insertNode as current node.
 	local next_current =
@@ -100,13 +101,19 @@ local function unlink_set_adjacent_as_current_no_log(snippet)
 			snippet.parent_node:input_leave_children()
 		else
 			-- set no_move.
-			next_current:input_enter(true)
+			local ok, err = pcall(next_current.input_enter, next_current, true)
+			if not ok then
+				-- this won't try to set the previously broken snippet as
+				-- current, since that link is removed in
+				-- `remove_from_jumplist`.
+				unlink_set_adjacent_as_current(next_current, "Error while setting adjacent snippet as current node: %s", err)
+			end
 		end
 	end
 
 	session.current_nodes[vim.api.nvim_get_current_buf()] = next_current
 end
-local function unlink_set_adjacent_as_current(snippet, reason, ...)
+function unlink_set_adjacent_as_current(snippet, reason, ...)
 	log.warn("Removing snippet %s: %s", snippet.trigger, reason:format(...))
 	unlink_set_adjacent_as_current_no_log(snippet)
 end
