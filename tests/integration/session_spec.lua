@@ -242,7 +242,8 @@ describe("session", function()
 			{0:~                                                 }|
 			{2:-- INSERT --}                                      |]]}
 		-- seven jumps to go to i(0), 8th, again, should not do anything.
-		jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1)
+		jump(1) jump(1) jump(1) jump(1)
+		jump(1) jump(1) jump(1)
 		screen:expect{grid=[[
 			/**                                               |
 			 * A short Description                            |
@@ -274,6 +275,8 @@ describe("session", function()
 			{0:~                                                 }|
 			{0:~                                                 }|
 			{2:-- INSERT --}                                      |]]}
+		jump(1)
+		screen:expect{unchanged = true}
 	end)
 	it("Deleted snippet is handled properly when jumping.", function()
 		feed("o<Cr><Cr><Up>fn")
@@ -415,8 +418,774 @@ describe("session", function()
 			{2:-- INSERT --}                                      |]]}
 		jump(1) jump(1)
 		feed("<Esc>llllvbbbx")
-		screen:snapshot_util()
-		jump(-1) jump(-1)
-		screen:snapshot_util()
+		-- first jump goes into function-arguments, second will trigger update,
+		-- which will in turn recognize the broken snippet.
+		-- The third jump will then go into the outer snippet.
+		jump(1) jump(1) jump(-1)
+		screen:expect{grid=[[
+			                                                  |
+			                                                  |
+			/**                                               |
+			 * ^A{3: short Description}                            |
+			 */                                               |
+			public void myFunc() {                            |
+			        /**                                       |
+			         * A short Description                    |
+			         */                                       |
+			        c() {                                     |
+			                                                  |
+			        }                                         |
+			}                                                 |
+			                                                  |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{2:-- SELECT --}                                      |]]}
+		-- this should jump into the $0 of the outer snippet, highlighting the
+		-- entire nested snippet.
+		jump(1)
+		screen:expect{grid=[[
+			                                                  |
+			                                                  |
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			public void myFunc() {                            |
+			        ^/{3:**}                                       |
+			{3:         * A short Description}                    |
+			{3:         */}                                       |
+			{3:        c() {}                                     |
+			{3:                }                                  |
+			{3:        }}                                         |
+			}                                                 |
+			                                                  |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{2:-- SELECT --}                                      |]]}
+	end)
+	for _, link_roots_val in ipairs({"true", "false"}) do
+		it(("Snippets are inserted according to link_roots and keep_roots=%s"):format(link_roots_val), function()
+			exec_lua(([[
+				ls.setup({
+					keep_roots = %s,
+					link_roots = %s
+				})
+			]]):format(link_roots_val, link_roots_val))
+
+			feed("ifn")
+			expand()
+			-- "o" does not extend the extmark of the active snippet.
+			feed("<Esc>Go<Cr>fn")
+			expand()
+			jump(-1) jump(-1)
+			-- if linked, should end up back in the original snippet, if not,
+			-- stay in second.
+			if link_roots_val == "true" then
+				screen:expect{grid=[[
+					/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					        ^                                          |
+					}                                                 |
+					                                                  |
+					/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					                                                  |
+					}                                                 |
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{2:-- INSERT --}                                      |]]}
+			else
+				screen:expect{grid=[[
+					/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					                                                  |
+					}                                                 |
+					                                                  |
+					^/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					                                                  |
+					}                                                 |
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{2:-- INSERT --}                                      |]]}
+			end
+		end)
+	end
+	for _, keep_roots_val in ipairs({"true", "false"}) do
+		it("Root-snippets are stored iff keep_roots=true", function()
+			exec_lua(([[
+				ls.setup({
+					keep_roots = %s,
+				})
+			]]):format(keep_roots_val, keep_roots_val))
+
+			feed("ifn")
+			expand()
+			-- "o" does not extend the extmark of the active snippet.
+			feed("<Esc>Go<Cr>fn")
+			expand()
+
+			-- jump into insert-node in first snippet.
+			local err = exec_lua(
+				[[return {pcall(ls.activate_node, {pos = {1, 8}})}]]
+			)[2]
+
+			-- if linked, should end up back in the original snippet, if not,
+			-- stay in second.
+			if keep_roots_val == "true" then
+			screen:expect{grid=[[
+				/**                                               |
+				 * ^A{3: short Description}                            |
+				 */                                               |
+				public void myFunc() {                            |
+				                                                  |
+				}                                                 |
+				                                                  |
+				/**                                               |
+				 * A short Description                            |
+				 */                                               |
+				public void myFunc() {                            |
+				                                                  |
+				}                                                 |
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{2:-- SELECT --}                                      |]]}
+			else
+				assert(
+					err:match(
+						"No Snippet at that position"
+					)
+				)
+			end
+		end)
+	end
+	for _, link_children_val in ipairs({"true", "false"}) do
+		it("Child-snippets are linked iff link_children=true", function()
+			exec_lua(([[
+				ls.setup({
+					link_children = %s,
+				})
+			]]):format(link_children_val))
+
+			feed("ifn")
+			expand()
+			-- expand child-snippet in $0 of original snippet.
+			feed("<Esc>jafn")
+			expand()
+			-- expand another child.
+			feed("<Esc>jjAfn")
+			expand()
+			screen:expect{grid=[[
+				/**                                               |
+				 * A short Description                            |
+				 */                                               |
+				public void myFunc() {                            |
+				        /**                                       |
+				         * A short Description                    |
+				         */                                       |
+				        public void myFunc() {                    |
+				                                                  |
+				        }/**                                      |
+				         * A short Description                    |
+				         */                                       |
+				        ^public void myFunc() {                    |
+				                                                  |
+				        }                                         |
+				}                                                 |
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{0:~                                                 }|
+				{2:-- INSERT --}                                      |]]}
+
+			-- if linked, should end up back in the original snippet, if not,
+			-- stay in second.
+			if link_children_val == "true" then
+				-- make sure we can jump into the previous child...
+				jump(-1) jump(-1)
+				screen:expect{grid=[[
+					/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					        /**                                       |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                ^                                  |
+					        }/**                                      |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }                                         |
+					}                                                 |
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{2:-- INSERT --}                                      |]]}
+				-- ...and from the first child back into the parent...
+				jump(-1) jump(-1) jump(-1) jump(-1) jump(-1) jump(-1) jump(-1) jump(-1)
+				screen:expect{grid=[[
+					/**                                               |
+					 * ^A{3: short Description}                            |
+					 */                                               |
+					public void myFunc() {                            |
+					        /**                                       |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }/**                                      |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }                                         |
+					}                                                 |
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{2:-- SELECT --}                                      |]]}
+				-- ...and back to the end of the second snippet...
+				-- (first only almost to the end, to make sure we makde the correct number of jumps).
+				jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1) jump(1)
+				screen:expect{grid=[[
+					/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					        /**                                       |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }/**                                      |
+					         * ^A{3: short Description}                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }                                         |
+					}                                                 |
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{2:-- SELECT --}                                      |]]}
+				jump(1)
+				screen:expect{grid=[[
+					/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					        /**                                       |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }/**                                      |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                ^                                  |
+					        }                                         |
+					}                                                 |
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{2:-- INSERT --}                                      |]]}
+				-- test inability to jump beyond a few times, I've had bugs
+				-- where after a multiple jumps, a new node became active.
+				jump(1)
+				screen:expect{unchanged = true}
+				jump(1)
+				screen:expect{unchanged = true}
+				jump(1)
+				screen:expect{unchanged = true}
+
+				-- For good measure, make sure the node is actually still active.
+				jump(-1)
+				screen:expect{grid=[[
+					/**                                               |
+					 * A short Description                            |
+					 */                                               |
+					public void myFunc() {                            |
+					        /**                                       |
+					         * A short Description                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }/**                                      |
+					         * ^A{3: short Description}                    |
+					         */                                       |
+					        public void myFunc() {                    |
+					                                                  |
+					        }                                         |
+					}                                                 |
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{0:~                                                 }|
+					{2:-- SELECT --}                                      |]]}
+			else
+
+			end
+		end)
+	end
+	it("Snippets with destroyed extmarks are not used as parents.", function()
+		feed("ifn")
+		expand()
+		-- delete the entier text of a textNode, which will make
+		-- extmarks_valid() false. 
+		feed("<Esc>eevllx")
+		-- insert snippet inside the invalid parent.
+		feed("jAfn")
+		expand()
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			public voiyFunc() {                               |
+			        /**                                       |
+			         * A short Description                    |
+			         */                                       |
+			        ^public void myFunc() { {4:●}                  |
+			                                                  |
+			        }                                         |
+			}                                                 |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+
+		-- make sure the parent is invalid.
+		jump(-1)
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			public voiyFunc() {                               |
+			        ^/**                                       |
+			         * A short Description                    |
+			         */                                       |
+			        public void myFunc() {                    |
+			                                                  |
+			        }                                         |
+			}                                                 |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+
+		-- should not move back into the parent.
+		jump(-1)
+		screen:expect{unchanged = true}
+	end)
+	it("region_check_events works correctly", function()
+		exec_lua([[
+			ls.setup({
+				history = true,
+				region_check_events = {"CursorHold", "InsertLeave"},
+				ext_opts = {
+					[require("luasnip.util.types").choiceNode] = {
+						active = {
+							virt_text = {{"●", "ErrorMsg"}},
+							priority = 0
+						},
+					}
+				},
+			})
+		]])
+
+		-- expand snippet.
+		feed("ifn")
+		expand()
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			^public void myFunc() { {4:●}                          |
+			                                                  |
+			}                                                 |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+		-- leave its region.
+		feed("<Esc>Go<Esc>")
+		-- check we have left the snippet (choiceNode indicator no longer active).
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			public void myFunc() {                            |
+			                                                  |
+			}                                                 |
+			^                                                  |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			                                                  |]]}
+
+		-- re-activate $0, expand child.
+		jump(-1) jump(1)
+		feed("fn")
+		expand()
+
+		-- jump behind child, activate region_leave, make sure the child and
+		-- root-snippet are _not_ exited.
+		feed("<Esc>jjA<Esc>o<Esc>")
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			public void myFunc() {                            |
+			        /**                                       |
+			         * A short Description                    |
+			         */                                       |
+			        public void myFunc() { {4:●}                  |
+			                                                  |
+			        }                                         |
+			^                                                  |
+			}                                                 |
+			                                                  |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			                                                  |]]}
+		-- .. and now both are left upon leaving the region of the root-snippet.
+		feed("<Esc>jji<Esc>")
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			public void myFunc() {                            |
+			        /**                                       |
+			         * A short Description                    |
+			         */                                       |
+			        public void myFunc() {                    |
+			                                                  |
+			        }                                         |
+			                                                  |
+			}                                                 |
+			^                                                  |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			                                                  |]]}
+	end)
+	it("delete_check_events works correctly", function()
+		exec_lua([[
+			ls.setup({
+				history = true,
+				delete_check_events = "TextChanged",
+				ext_opts = {
+					[require("luasnip.util.types").choiceNode] = {
+						active = {
+							virt_text = {{"●", "ErrorMsg"}},
+							priority = 0
+						},
+					}
+				},
+			})
+		]])
+
+		-- expand.
+		feed("ifn")
+		expand()
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			^public void myFunc() { {4:●}                          |
+			                                                  |
+			}                                                 |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{2:-- INSERT --}                                      |]]}
+
+		-- delete textNode, to trigger unlink_current_if_deleted via esc.
+		feed("<Esc>eevllx<Esc>")
+		screen:expect{grid=[[
+			/**                                               |
+			 * A short Description                            |
+			 */                                               |
+			public voi^yFunc() {                               |
+			                                                  |
+			}                                                 |
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			{0:~                                                 }|
+			                                                  |]]}
+		jump(1)
+		screen:expect{unchanged=true}
 	end)
 end)

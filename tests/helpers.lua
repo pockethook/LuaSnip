@@ -88,6 +88,7 @@ function M.session_setup_luasnip(opts)
 		} or {}, setup_extend))
 	]],
 		-- passing nil here means the argument-list is terminated, I think.
+		-- Just pass false instead of nil/false.
 		hl_choiceNode or false, setup_extend
 	)
 
