@@ -1362,18 +1362,10 @@ function Snippet:subtree_set_rgrav(rgrav)
 	end
 end
 
--- traverses this snippet, and finds the smallest node containing pos.
--- pos-column has to be a byte-index, not a display-column.
-function Snippet:smallest_node_at(pos, mode)
-	local self_from, self_to = self.mark:pos_begin_end_raw()
-	assert(util.pos_cmp(self_from, pos) <= 0 and util.pos_cmp(pos, self_to) <= 0, "pos is not inside the snippet.")
-
-	local smallest_node = self:node_at(pos, mode)
-	assert(smallest_node ~= nil, "could not find a smallest node (very unexpected)")
-
-	return smallest_node
-end
-
+-- for this to always return a node if pos is withing the snippet-boundaries,
+-- the snippet must have valid extmarks.
+-- Otherwise, it is possible that some region inside the snippet is not covered
+-- by the snippet's nodes.
 function Snippet:node_at(pos, mode)
 	if #self.nodes == 0 then
 		-- special case: no children (can naturally occur with dynamicNode,
@@ -1381,8 +1373,28 @@ function Snippet:node_at(pos, mode)
 		return self
 	end
 
-	local found_node = node_util.binarysearch_pos(self.nodes, pos, true, mode)
-	assert(found_node ~= nil, "could not find node in snippet")
+	local found_node, indx = node_util.binarysearch_pos(self.nodes, pos, true, mode)
+	if not found_node then
+		-- may happen if extmark-gravities cause a hole in the snippet.
+		-- For example, if a node A is before a node B, and A's end has left
+		-- gravity, while B's start has right gravity.
+		-- If we query the node at the position of the right edge of A's end,
+		-- it will not be found if extmarks are respected.
+		-- We fix this case here, since it is easier and that case should
+		-- rarely occur, if ever, and then may only cause an issue if we return
+		-- a non-interactive/linkable node, if there was an
+		-- interactive/linkable node adjacent as well.
+		local snip_from, snip_to = self.mark.pos_begin_end_raw()
+		if util.pos_cmp(pos, snip_from) >= 0 and util.pos_cmp(pos, snip_to) <= 0 then
+			-- fall back to adjacent node.
+			-- binarysearch_pos returns the index a node at pos would have to
+			-- be inserted at s.t. the nodes are still sorted, it is thus 1 <=
+			-- indx <= #nodes+1, since it might be appended, and we have to
+			-- subtract one from indx only in that case.
+			found_node = self.nodes[indx > #self.nodes and indx-1 or indx]
+		end
+	end
+	assert(found_node ~= nil, "Could not find a node at that position.")
 
 	return found_node:node_at(pos, mode)
 end

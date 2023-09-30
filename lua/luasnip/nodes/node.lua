@@ -503,8 +503,8 @@ end
 --
 -- Unfortunately, we cannot guarantee that two extmarks on the same position
 -- also have the same gravities, for exmample if the text inside a focused node
--- is deleted, and then another unrelated node is focused, the two endpoints
--- will have opposing rgravs.
+-- is deleted, and then another unrelated node is focused, the two endpoints of
+-- the previously focused node will have opposing rgravs.
 -- Maybe this whole procedure could be sped up further if we can assume that
 -- identical endpoints imply identical rgravs.
 local function focus_node(self, lrgrav, rrgrav)
