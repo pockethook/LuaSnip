@@ -250,24 +250,30 @@ describe("snippets_basic", function()
 		})
 		-- last snippet is not forgotten (yet).
 		exec_lua("ls.jump(1)")
-		screen:expect{grid=[[
+		screen:expect({
+			grid = [[
 			a[^a{3:[]ab}]ab                                        |
 			{0:~                                                 }|
-			{2:-- SELECT --}                                      |]]}
+			{2:-- SELECT --}                                      |]],
+		})
 
 		feed("<Esc>o")
 		exec_lua("ls.snip_expand(" .. snip .. ")")
-		screen:expect{grid=[[
+		screen:expect({
+			grid = [[
 			a[a[]ab]ab                                        |
 			a[^]ab                                             |
-			{2:-- INSERT --}                                      |]]}
+			{2:-- INSERT --}                                      |]],
+		})
 		exec_lua("ls.jump(-1) ls.jump(-1)")
 
 		-- first snippet can't be accessed anymore.
-		screen:expect{grid=[[
+		screen:expect({
+			grid = [[
 			a[a[]ab]ab                                        |
 			^a[]ab                                             |
-			{2:-- INSERT --}                                      |]]}
+			{2:-- INSERT --}                                      |]],
+		})
 	end)
 
 	it("history=true allows jumping back into exited snippet.", function()
@@ -1156,31 +1162,37 @@ describe("snippets_basic", function()
 		feed("iaa")
 		exec_lua([[ ls.expand() ]])
 		exec_lua([[ ls.jump(1) ]])
-		screen:expect{grid=[[
+		screen:expect({
+			grid = [[
 			a:(^)                                              |
 			{0:~                                                 }|
-			{2:-- INSERT --}                                      |]]}
+			{2:-- INSERT --}                                      |]],
+		})
 
 		feed("aa")
 		exec_lua([[ ls.expand() ]])
 		exec_lua([[ ls.jump(1) ]])
-		screen:expect{grid=[[
+		screen:expect({
+			grid = [[
 			a:(a:(^))                                          |
 			{0:~                                                 }|
-			{2:-- INSERT --}                                      |]]}
+			{2:-- INSERT --}                                      |]],
+		})
 
 		feed("aa")
 		exec_lua([[ ls.expand() ]])
 		exec_lua([[ ls.jump(1) ]])
-		screen:expect{grid=[[
+		screen:expect({
+			grid = [[
 			a:(a:(a:(^)))                                      |
 			{0:~                                                 }|
-			{2:-- INSERT --}                                      |]]}
+			{2:-- INSERT --}                                      |]],
+		})
 
 		-- jump should not move cursor!
 		-- for some reason need multiple jumps to trigger the mistake.
 		exec_lua([[ ls.jump(1)]])
 		exec_lua([[ ls.jump(1)]])
-		screen:expect{unchanged = true}
+		screen:expect({ unchanged = true })
 	end)
 end)
