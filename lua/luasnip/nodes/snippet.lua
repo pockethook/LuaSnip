@@ -544,18 +544,17 @@ local function insert_into_jumplist(snippet, start_node, current_node, parent_no
 	local link_children = session.config.link_children
 
 	if parent_node then
-		local can_link_parent_node = node_util.linkable_node(parent_node)
-		-- snippetNode (which has to be empty to be viable here) and
-		-- insertNode can both deal with inserting a snippet inside them
-		-- (ie. hooking it up st. it can be visited after jumping back to
-		-- the snippet of parent).
-		-- in all cases
-		if link_children and prev ~= nil then
-			-- if we have a previous snippet we can link to, just do that.
-			prev.next.next = snippet
-			start_node.prev = prev.insert_nodes[0]
-		else
-			if can_link_parent_node then
+		if node_util.linkable_node(parent_node) then
+			-- snippetNode (which has to be empty to be viable here) and
+			-- insertNode can both deal with inserting a snippet inside them
+			-- (ie. hooking it up st. it can be visited after jumping back to
+			-- the snippet of parent).
+			-- in all cases
+			if link_children and prev ~= nil then
+				-- if we have a previous snippet we can link to, just do that.
+				prev.next.next = snippet
+				start_node.prev = prev.insert_nodes[0]
+			else
 				-- only jump from parent to child if link_children is set.
 				if link_children then
 					-- prev is nil, but we can link up using the parent.
@@ -563,31 +562,38 @@ local function insert_into_jumplist(snippet, start_node, current_node, parent_no
 				end
 				-- make sure we can jump back to the parent.
 				start_node.prev = parent_node
-			else
-				-- no way to link up, just jump back to current_node, but
-				-- don't jump from current_node to this snippet (I feel
-				-- like that should be good: one can still get back to ones
-				-- previous history, and we don't mess up whatever jumps
-				-- are set up around current_node)
-				start_node.prev = current_node
 			end
-		end
 
-		-- exact same reasoning here as in prev-case above, omitting comments.
-		if link_children and next ~= nil then
-			-- jump from next snippets start_node to $0.
-			next.prev.prev = snippet.insert_nodes[0]
-			-- jump from $0 to next snippet (skip its start_node)
-			snippet.insert_nodes[0].next = next
-		else
-			if can_link_parent_node then
+			-- exact same reasoning here as in prev-case above, omitting comments.
+			if link_children and next ~= nil then
+				-- jump from next snippets start_node to $0.
+				next.prev.prev = snippet.insert_nodes[0]
+				-- jump from $0 to next snippet (skip its start_node)
+				snippet.insert_nodes[0].next = next
+			else
 				if link_children then
 					parent_node.inner_last = snippet.insert_nodes[0]
 				end
 				snippet.insert_nodes[0].next = parent_node
-			else
-				snippet.insert_nodes[0].next = current_node
 			end
+		else
+			-- naively, even if the parent is linkable, there might be snippets
+			-- before/after that share the same parent, so we could
+			-- theoretically link up with them.
+			-- This, however, can cause cyclic jumps, for example if the
+			-- previous child-snippet contains the current node: we will jump
+			-- from the end of the new snippet into the previous child-snippet,
+			-- and from its last node into the new snippet.
+			-- Since cycles should be avoided (very weird if the jumps just go
+			-- in a circle), we have no choice but to fall back to this
+			-- old-style linkage.
+
+			-- Don't jump from current_node to this snippet (I feel
+			-- like that should be good: one can still get back to ones
+			-- previous history, and we don't mess up whatever jumps
+			-- are set up around current_node)
+			start_node.prev = current_node
+			snippet.insert_nodes[0].next = current_node
 		end
 	-- don't link different root-nodes for unlinked_roots.
 	elseif link_roots then
@@ -615,10 +621,22 @@ function Snippet:trigger_expand(current_node, pos_id, env)
 		tree_preference = node_util.binarysearch_preference.outside,
 		snippet_preference = node_util.binarysearch_preference.linkable
 	})
+
 	if current_node then
-		node_util.refocus(current_node, parent_node)
 		if parent_node then
-			parent_node:input_enter_children()
+			if node_util.linkable_node(parent_node) then
+				node_util.refocus(current_node, parent_node)
+				parent_node:input_enter_children()
+			else
+				-- enter extmarks of parent_node, but don't enter it
+				-- "logically", it will not be the parent of the snippet.
+				parent_node:focus()
+				-- enter current node, it will contain the new snippet.
+				current_node:input_enter_children()
+			end
+		else
+			-- if no parent_node, completely leave.
+			node_util.refocus(current_node, nil)
 		end
 	end
 

@@ -731,6 +731,7 @@ local function activate_node(opts)
 	opts = opts or {}
 	local pos = opts.pos or util.get_cursor_0ind()
 	local strict = vim.F.if_nil(opts.strict, false)
+	local select = vim.F.if_nil(opts.select, true)
 
 	-- find tree-node the snippet should be inserted at (could be before another node).
 	local _, _, _, node = node_util.snippettree_find_undamaged_node(pos, {
@@ -767,11 +768,13 @@ local function activate_node(opts)
 	end
 
 	node_util.refocus(session.current_nodes[vim.api.nvim_get_current_buf()], node)
-	-- input_enter node again, to get highlight and the like.
-	-- One side-effect of this is that an event will be execute twice, but I
-	-- feel like that is a trade-off worth doing, since it otherwise refocus
-	-- would have to be more complicated (or at least, restructured).
-	node:input_enter()
+	if select then
+		-- input_enter node again, to get highlight and the like.
+		-- One side-effect of this is that an event will be execute twice, but I
+		-- feel like that is a trade-off worth doing, since it otherwise refocus
+		-- would have to be more complicated (or at least, restructured).
+		node:input_enter()
+	end
 	session.current_nodes[vim.api.nvim_get_current_buf()] = node
 end
 
